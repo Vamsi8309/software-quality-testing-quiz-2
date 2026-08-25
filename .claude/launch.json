@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game1-quiz",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8791", "--directory", "Game1_Software_Quality_Testing"],
+      "port": 8791
+    }
+  ]
+}
