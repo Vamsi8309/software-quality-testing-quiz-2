@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Software Quality &amp; Testing Quiz</title>
+<meta name="description" content="Test your QA knowledge in 5 quick questions.">
+<link rel="canonical" href="https://vamsi8309.github.io/software-quality-testing-quiz-2/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Software Quality &amp; Testing Quiz">
+<meta property="og:description" content="Test your QA knowledge in 5 quick questions.">
+<meta property="og:url" content="https://vamsi8309.github.io/software-quality-testing-quiz-2/">
+<meta property="og:image" content="https://vamsi8309.github.io/software-quality-testing-quiz-2/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Software Quality &amp; Testing Quiz">
+<meta name="twitter:description" content="Test your QA knowledge in 5 quick questions.">
+<meta name="twitter:image" content="https://vamsi8309.github.io/software-quality-testing-quiz-2/og.png">
+<link rel="stylesheet" href="style.css?v=admin-only-board-1">
+</head>
+<body>
+
+  <div class="bg-shapes">
+    <span></span><span></span><span></span><span></span>
+  </div>
+
+  <!-- START SCREEN -->
+  <section id="start-screen" class="screen active">
+    <div class="card start-card">
+      <h2>Software Quality &amp; Testing</h2>
+      <p class="subtitle">5 Questions &bull; Multiple Choice &bull; Test your QA knowledge!</p>
+      <div class="rules">
+        <div class="rule"><span>⏱️</span> 20 seconds per question</div>
+        <div class="rule"><span>✅</span> +20 points for each correct answer</div>
+        <div class="rule"><span>🏆</span> Score 80+ to earn a Champion badge</div>
+      </div>
+      <label class="name-label" for="player-name">Enter your name to begin</label>
+      <input type="text" id="player-name" placeholder="Your name" maxlength="30" autocomplete="off">
+      <label class="name-label" for="employee-id">Employee ID</label>
+      <input type="text" id="employee-id" placeholder="Your employee ID" maxlength="20" autocomplete="off">
+      <p class="attempt-note">Each employee can play only once.</p>
+      <p id="start-error" class="start-error" role="alert" aria-live="polite"></p>
+      <button id="start-btn" class="btn-primary">Start Game</button>
+      <button type="button" id="admin-view-btn" class="admin-view-btn">Admin View</button>
+    </div>
+  </section>
+
+  <div id="admin-modal" class="admin-modal" hidden>
+    <div class="admin-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-title">
+      <button type="button" id="admin-close-btn" class="admin-close-btn" aria-label="Close Admin View">&times;</button>
+      <h2 id="admin-title">Admin View</h2>
+
+      <div id="admin-login" class="admin-login">
+        <label for="admin-pin">Enter Admin PIN</label>
+        <input type="password" id="admin-pin" inputmode="numeric" maxlength="4" autocomplete="off">
+        <p id="admin-error" class="admin-error" role="alert" aria-live="polite"></p>
+        <button type="button" id="admin-login-btn" class="btn-primary">Unlock</button>
+      </div>
+
+      <div id="admin-content" hidden>
+        <div class="admin-content-header">
+          <h3>Leaderboard <small>Top 10</small></h3>
+          <button type="button" id="admin-lock-btn" class="admin-lock-btn">Lock</button>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th scope="col">Rank</th>
+                <th scope="col">Name</th>
+                <th scope="col">Employee ID</th>
+                <th scope="col">Score</th>
+                <th scope="col">Correct</th>
+                <th scope="col">Avg Time</th>
+              </tr>
+            </thead>
+            <tbody id="admin-records-list">
+              <tr class="admin-empty"><td colspan="6">No leaderboard results yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- QUIZ SCREEN -->
+  <section id="quiz-screen" class="screen">
+    <div class="card quiz-card">
+      <div class="quiz-header">
+        <div class="progress-info">
+          <span id="q-counter">Question 1 / 5</span>
+          <div class="progress-bar"><div id="progress-fill"></div></div>
+        </div>
+        <div class="timer-wrap">
+          <svg viewBox="0 0 36 36" class="timer-ring">
+            <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+            <path id="ring-progress" class="ring-progress" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          </svg>
+          <span id="timer-text">20</span>
+        </div>
+        <div class="score-chip">Score: <span id="live-score">0</span></div>
+      </div>
+
+      <h3 id="question-text">Question text goes here</h3>
+
+      <div id="options-list" class="options-list"></div>
+
+      <div class="quiz-footer">
+        <span id="feedback-text" class="feedback"></span>
+        <button id="next-btn" class="btn-primary" disabled>Next</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULT SCREEN -->
+  <section id="result-screen" class="screen">
+    <div class="card result-card">
+      <div id="result-emoji" class="result-emoji">🎉</div>
+      <h1 id="result-title">Great job!</h1>
+      <p id="result-player"></p>
+      <div class="score-circle">
+        <span id="final-score">0</span>
+        <small>/ 100</small>
+      </div>
+      <div id="result-badge" class="badge"></div>
+      <div class="stats-row">
+        <div class="stat"><strong id="stat-correct">0</strong><span>Correct</span></div>
+        <div class="stat"><strong id="stat-wrong">0</strong><span>Wrong</span></div>
+        <div class="stat"><strong id="stat-time">0s</strong><span>Avg Time</span></div>
+      </div>
+
+      <div id="review-list" class="review-list"></div>
+
+      <button id="restart-btn" class="btn-secondary">New Player</button>
+    </div>
+  </section>
+
+  <script>
+    // LEADERBOARD_CLEAR_20260818: clear existing demo/results data once per browser.
+    (() => {
+      const resetKey = "softwareQualityTestingLeaderboardCleared20260818";
+      if (localStorage.getItem(resetKey)) return;
+      localStorage.removeItem("softwareQualityTestingLeaderboard");
+      localStorage.setItem(resetKey, "true");
+    })();
+  </script>
+  <script src="script.js?v=admin-only-board-1"></script>
+</body>
+</html>
+
+
+<!-- node games\serve.js games\Game1_Software_Quality_Testing 8791 -->
+<!-- Start-Process "http://localhost:8791/" -->
