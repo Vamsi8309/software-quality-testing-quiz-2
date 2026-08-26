@@ -48,8 +48,12 @@
       <div id="admin-content" hidden>
         <div class="admin-content-header">
           <h3>Leaderboard <small>Top 10</small></h3>
-          <button type="button" id="admin-lock-btn" class="admin-lock-btn">Lock</button>
+          <div class="admin-header-actions">
+            <button type="button" id="admin-clear-btn" class="admin-clear-btn">Clear Leaderboard</button>
+            <button type="button" id="admin-lock-btn" class="admin-lock-btn">Lock</button>
+          </div>
         </div>
+        <p id="admin-status" class="admin-status" role="status" aria-live="polite"></p>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>

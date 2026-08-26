@@ -226,6 +226,11 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .admin-lock-btn {
   border: 1px solid var(--primary);
   border-radius: 8px;
@@ -234,6 +239,27 @@ body {
   padding: 7px 12px;
   font-weight: 700;
   cursor: pointer;
+}
+.admin-clear-btn {
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--danger);
+  padding: 7px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-clear-btn:hover:not(:disabled) { background: #FEF2F2; }
+.admin-clear-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.admin-status {
+  min-height: 18px;
+  margin: 0 0 10px;
+  color: #15803D;
+  font-size: 12px;
+  font-weight: 700;
 }
 .admin-table-wrap {
   overflow-x: auto;
