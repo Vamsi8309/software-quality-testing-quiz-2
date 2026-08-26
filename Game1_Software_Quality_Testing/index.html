@@ -53,6 +53,13 @@
             <button type="button" id="admin-lock-btn" class="admin-lock-btn">Lock</button>
           </div>
         </div>
+        <div class="admin-remove-player">
+          <label for="admin-employee-id">Remove individual player</label>
+          <div class="admin-remove-row">
+            <input type="text" id="admin-employee-id" placeholder="6 or 7 digit Employee ID" inputmode="numeric" pattern="[0-9]{6,7}" minlength="6" maxlength="7" autocomplete="off">
+            <button type="button" id="admin-remove-player-btn" class="admin-remove-player-btn">Remove Player</button>
+          </div>
+        </div>
         <p id="admin-status" class="admin-status" role="status" aria-live="polite"></p>
         <div class="admin-table-wrap">
           <table class="admin-table">

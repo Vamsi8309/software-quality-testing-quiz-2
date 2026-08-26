@@ -89,6 +89,8 @@ const adminLoginBtn = document.getElementById("admin-login-btn");
 const adminContent = document.getElementById("admin-content");
 const adminLockBtn = document.getElementById("admin-lock-btn");
 const adminClearBtn = document.getElementById("admin-clear-btn");
+const adminEmployeeIdInput = document.getElementById("admin-employee-id");
+const adminRemovePlayerBtn = document.getElementById("admin-remove-player-btn");
 const adminStatus = document.getElementById("admin-status");
 const adminRecordsList = document.getElementById("admin-records-list");
 
@@ -321,7 +323,7 @@ nextBtn.addEventListener("click", () => {
 function renderAdminRecords() {
   const entries = getLeaderboard();
   adminRecordsList.innerHTML = "";
-  adminClearBtn.disabled = entries.length === 0;
+  adminClearBtn.disabled = entries.length === 0 && getPlayedEmployeeIds().length === 0;
 
   if (entries.length === 0) {
     const emptyRow = document.createElement("tr");
@@ -360,8 +362,9 @@ function showAdminLogin() {
   adminLogin.hidden = false;
   adminContent.hidden = true;
   adminPinInput.value = "";
+  adminEmployeeIdInput.value = "";
   adminError.textContent = "";
-  adminStatus.textContent = "";
+  showAdminStatus("");
   adminPinInput.focus();
 }
 
@@ -373,8 +376,9 @@ function openAdminView() {
 function closeAdminView() {
   adminModal.hidden = true;
   adminPinInput.value = "";
+  adminEmployeeIdInput.value = "";
   adminError.textContent = "";
-  adminStatus.textContent = "";
+  showAdminStatus("");
 }
 
 function unlockAdminView() {
@@ -387,23 +391,77 @@ function unlockAdminView() {
   adminError.textContent = "";
   adminLogin.hidden = true;
   adminContent.hidden = false;
-  adminStatus.textContent = "";
+  adminEmployeeIdInput.value = "";
+  showAdminStatus("");
   renderAdminRecords();
 }
 
 function clearLeaderboard() {
   const confirmed = window.confirm(
-    "Clear all leaderboard results saved in this browser? Employee attempt records will remain unchanged."
+    "Clear all player scores and attempt records saved in this browser? Every employee will be able to play again."
   );
   if (!confirmed) return;
 
   try {
     localStorage.removeItem(LEADERBOARD_KEY);
+    localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
     renderAdminRecords();
-    adminStatus.textContent = "Leaderboard cleared successfully.";
+    showAdminStatus("All player data was cleared. Employees can play again.");
   } catch {
-    adminStatus.textContent = "The leaderboard could not be cleared. Check browser storage permissions and try again.";
+    showAdminStatus("Player data could not be cleared. Check browser storage permissions and try again.", true);
   }
+}
+
+function removePlayer() {
+  const employeeIdToRemove = normalizeEmployeeId(adminEmployeeIdInput.value);
+
+  if (!EMPLOYEE_ID_PATTERN.test(employeeIdToRemove)) {
+    showAdminStatus("Enter a valid 6 or 7 digit Employee ID.", true);
+    adminEmployeeIdInput.focus();
+    return;
+  }
+
+  const entries = getLeaderboard();
+  const playedIds = getPlayedEmployeeIds();
+  const matchingEntryExists = entries.some(entry =>
+    typeof entry.employeeId === "string" && normalizeEmployeeId(entry.employeeId) === employeeIdToRemove
+  );
+  const matchingAttemptExists = playedIds.includes(employeeIdToRemove);
+
+  if (!matchingEntryExists && !matchingAttemptExists) {
+    showAdminStatus(`No player data was found for Employee ID ${employeeIdToRemove}.`, true);
+    adminEmployeeIdInput.focus();
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Remove all data for Employee ID ${employeeIdToRemove}? This employee will be able to play again.`
+  );
+  if (!confirmed) return;
+
+  const remainingEntries = entries.filter(entry =>
+    typeof entry.employeeId !== "string" || normalizeEmployeeId(entry.employeeId) !== employeeIdToRemove
+  );
+  const remainingPlayedIds = playedIds.filter(id => id !== employeeIdToRemove);
+
+  try {
+    if (remainingEntries.length === 0) localStorage.removeItem(LEADERBOARD_KEY);
+    else localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(remainingEntries));
+
+    if (remainingPlayedIds.length === 0) localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
+    else localStorage.setItem(PLAYED_EMPLOYEES_KEY, JSON.stringify(remainingPlayedIds));
+
+    adminEmployeeIdInput.value = "";
+    renderAdminRecords();
+    showAdminStatus(`Employee ID ${employeeIdToRemove} was removed and can play again.`);
+  } catch {
+    showAdminStatus("The player could not be removed. Check browser storage permissions and try again.", true);
+  }
+}
+
+function showAdminStatus(message, isError = false) {
+  adminStatus.textContent = message;
+  adminStatus.className = `admin-status${isError ? " error" : ""}`;
 }
 function getLeaderboard() {
   try {
@@ -515,7 +573,15 @@ adminViewBtn.addEventListener("click", openAdminView);
 adminCloseBtn.addEventListener("click", closeAdminView);
 adminLoginBtn.addEventListener("click", unlockAdminView);
 adminClearBtn.addEventListener("click", clearLeaderboard);
+adminRemovePlayerBtn.addEventListener("click", removePlayer);
 adminLockBtn.addEventListener("click", showAdminLogin);
+adminEmployeeIdInput.addEventListener("input", () => {
+  adminEmployeeIdInput.value = adminEmployeeIdInput.value.replace(/\D/g, "").slice(0, 7);
+  showAdminStatus("");
+});
+adminEmployeeIdInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") removePlayer();
+});
 adminPinInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") unlockAdminView();
 });
