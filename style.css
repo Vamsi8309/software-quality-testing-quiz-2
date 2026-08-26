@@ -342,11 +342,22 @@ body {
 .option-btn.correct .opt-letter { background: var(--success); color: #fff; }
 .option-btn.wrong { border-color: var(--danger); background: #FEF2F2; }
 .option-btn.wrong .opt-letter { background: var(--danger); color: #fff; }
+.answer-icon {
+  margin-left: auto;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 20px;
+  line-height: 1;
+}
 
 .quiz-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.feedback { font-size: 14px; font-weight: 600; flex: 1; }
+.feedback { font-size: 14px; font-weight: 600; flex: 1; display: flex; align-items: center; gap: 7px; }
 .feedback.correct { color: var(--success); }
 .feedback.wrong { color: var(--danger); }
+.feedback-icon {
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 20px;
+  line-height: 1;
+}
 .quiz-footer .btn-primary { width: auto; padding: 12px 26px; }
 
 /* RESULT SCREEN */

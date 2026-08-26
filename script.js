@@ -58,6 +58,7 @@ const PLAYED_EMPLOYEES_KEY = "softwareQualityTestingPlayedEmployees";
 const ADMIN_PIN = "2003";
 const LEADERBOARD_LIMIT = 10;
 const POINTS_PER_QUESTION = Math.floor(100 / QUESTIONS.length);
+const EMPLOYEE_ID_PATTERN = /^\d{6,7}$/;
 
 let currentIndex = 0;
 let score = 0;
@@ -147,6 +148,12 @@ startBtn.addEventListener("click", () => {
     return;
   }
 
+  if (!EMPLOYEE_ID_PATTERN.test(enteredEmployeeId)) {
+    startError.textContent = "Employee ID must contain exactly 6 or 7 digits.";
+    employeeIdInput.focus();
+    return;
+  }
+
   if (getPlayedEmployeeIds().includes(normalizeEmployeeId(enteredEmployeeId))) {
     startError.textContent = "This Employee ID has already played. Each employee can play only once.";
     employeeIdInput.focus();
@@ -172,6 +179,10 @@ startBtn.addEventListener("click", () => {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") startBtn.click();
   });
+});
+
+employeeIdInput.addEventListener("input", () => {
+  employeeIdInput.value = employeeIdInput.value.replace(/\D/g, "").slice(0, 7);
 });
 
 function loadQuestion() {
@@ -228,26 +239,51 @@ function selectOption(selectedIdx) {
 
   buttons.forEach((btn, idx) => {
     btn.disabled = true;
-    if (idx === item.correct) btn.classList.add("correct");
-    else if (idx === selectedIdx) btn.classList.add("wrong");
+    if (idx === item.correct) {
+      btn.classList.add("correct");
+      addAnswerIcon(btn, "✅", "Correct answer");
+    } else if (idx === selectedIdx) {
+      btn.classList.add("wrong");
+      addAnswerIcon(btn, "❌", "Wrong answer");
+    }
   });
 
   if (isCorrect) {
     score += POINTS_PER_QUESTION;
     liveScore.textContent = score;
-    feedbackText.textContent = "✅ Correct!";
-    feedbackText.classList.add("correct");
+    showAnswerFeedback("✅", "Correct!", "correct");
   } else if (selectedIdx === -1) {
-    feedbackText.textContent = "⏰ Time's up!";
-    feedbackText.classList.add("wrong");
+    showAnswerFeedback("⏰", "Time's up!", "wrong");
   } else {
-    feedbackText.textContent = "❌ Not quite.";
-    feedbackText.classList.add("wrong");
+    showAnswerFeedback("❌", "Not quite.", "wrong");
   }
 
   answers.push({ correct: isCorrect, timeTaken });
   progressFill.style.width = `${((currentIndex + 1) / QUESTIONS.length) * 100}%`;
   nextBtn.disabled = false;
+}
+
+function addAnswerIcon(button, symbol, label) {
+  const icon = document.createElement("span");
+  icon.className = "answer-icon";
+  icon.setAttribute("aria-label", label);
+  icon.textContent = symbol;
+  button.appendChild(icon);
+}
+
+function showAnswerFeedback(symbol, message, state) {
+  feedbackText.className = `feedback ${state}`;
+  feedbackText.replaceChildren();
+
+  const icon = document.createElement("span");
+  icon.className = "feedback-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = symbol;
+
+  const text = document.createElement("span");
+  text.textContent = message;
+
+  feedbackText.append(icon, text);
 }
 
 nextBtn.addEventListener("click", () => {
