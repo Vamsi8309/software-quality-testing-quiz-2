@@ -95,6 +95,7 @@ const progressFill = document.getElementById("progress-fill");
 const questionText = document.getElementById("question-text");
 const optionsList = document.getElementById("options-list");
 const feedbackText = document.getElementById("feedback-text");
+const answerReaction = document.getElementById("answer-reaction");
 const liveScore = document.getElementById("live-score");
 const timerText = document.getElementById("timer-text");
 const ringProgress = document.getElementById("ring-progress");
@@ -192,6 +193,8 @@ function loadQuestion() {
   questionText.textContent = item.q;
   feedbackText.textContent = "";
   feedbackText.className = "feedback";
+  answerReaction.textContent = "";
+  answerReaction.className = "answer-reaction";
   nextBtn.disabled = true;
   nextBtn.textContent = currentIndex === QUESTIONS.length - 1 ? "See Results" : "Next";
 
@@ -252,10 +255,13 @@ function selectOption(selectedIdx) {
     score += POINTS_PER_QUESTION;
     liveScore.textContent = score;
     showAnswerFeedback("✅", "Correct!", "correct");
+    showAnswerReaction("🎉 ✅ 😄", "Correct answer!", "correct");
   } else if (selectedIdx === -1) {
     showAnswerFeedback("⏰", "Time's up!", "wrong");
+    showAnswerReaction("⏰ 😅", "Time's up!", "wrong");
   } else {
     showAnswerFeedback("❌", "Not quite.", "wrong");
+    showAnswerReaction("😕 ❌ 💪", "Wrong answer — keep trying!", "wrong");
   }
 
   answers.push({ correct: isCorrect, timeTaken });
@@ -284,6 +290,21 @@ function showAnswerFeedback(symbol, message, state) {
   text.textContent = message;
 
   feedbackText.append(icon, text);
+}
+
+function showAnswerReaction(symbols, message, state) {
+  answerReaction.replaceChildren();
+
+  const emojiLine = document.createElement("span");
+  emojiLine.className = "reaction-emojis";
+  emojiLine.setAttribute("aria-hidden", "true");
+  emojiLine.textContent = symbols;
+
+  const reactionMessage = document.createElement("strong");
+  reactionMessage.textContent = message;
+
+  answerReaction.append(emojiLine, reactionMessage);
+  answerReaction.className = `answer-reaction ${state} show`;
 }
 
 nextBtn.addEventListener("click", () => {
