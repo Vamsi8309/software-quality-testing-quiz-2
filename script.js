@@ -88,6 +88,8 @@ const adminError = document.getElementById("admin-error");
 const adminLoginBtn = document.getElementById("admin-login-btn");
 const adminContent = document.getElementById("admin-content");
 const adminLockBtn = document.getElementById("admin-lock-btn");
+const adminClearBtn = document.getElementById("admin-clear-btn");
+const adminStatus = document.getElementById("admin-status");
 const adminRecordsList = document.getElementById("admin-records-list");
 
 const qCounter = document.getElementById("q-counter");
@@ -319,6 +321,7 @@ nextBtn.addEventListener("click", () => {
 function renderAdminRecords() {
   const entries = getLeaderboard();
   adminRecordsList.innerHTML = "";
+  adminClearBtn.disabled = entries.length === 0;
 
   if (entries.length === 0) {
     const emptyRow = document.createElement("tr");
@@ -358,6 +361,7 @@ function showAdminLogin() {
   adminContent.hidden = true;
   adminPinInput.value = "";
   adminError.textContent = "";
+  adminStatus.textContent = "";
   adminPinInput.focus();
 }
 
@@ -370,6 +374,7 @@ function closeAdminView() {
   adminModal.hidden = true;
   adminPinInput.value = "";
   adminError.textContent = "";
+  adminStatus.textContent = "";
 }
 
 function unlockAdminView() {
@@ -382,7 +387,23 @@ function unlockAdminView() {
   adminError.textContent = "";
   adminLogin.hidden = true;
   adminContent.hidden = false;
+  adminStatus.textContent = "";
   renderAdminRecords();
+}
+
+function clearLeaderboard() {
+  const confirmed = window.confirm(
+    "Clear all leaderboard results saved in this browser? Employee attempt records will remain unchanged."
+  );
+  if (!confirmed) return;
+
+  try {
+    localStorage.removeItem(LEADERBOARD_KEY);
+    renderAdminRecords();
+    adminStatus.textContent = "Leaderboard cleared successfully.";
+  } catch {
+    adminStatus.textContent = "The leaderboard could not be cleared. Check browser storage permissions and try again.";
+  }
 }
 function getLeaderboard() {
   try {
@@ -493,6 +514,7 @@ restartBtn.addEventListener("click", () => {
 adminViewBtn.addEventListener("click", openAdminView);
 adminCloseBtn.addEventListener("click", closeAdminView);
 adminLoginBtn.addEventListener("click", unlockAdminView);
+adminClearBtn.addEventListener("click", clearLeaderboard);
 adminLockBtn.addEventListener("click", showAdminLogin);
 adminPinInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") unlockAdminView();
