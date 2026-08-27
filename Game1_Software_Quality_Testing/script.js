@@ -117,7 +117,7 @@ function getPlayedEmployeeIds() {
   let savedIds = [];
   try {
     const parsedIds = JSON.parse(localStorage.getItem(PLAYED_EMPLOYEES_KEY) || "[]");
-    if (Array.isArray(parsedIds)) savedIds = parsedIds;
+    if (Array.isArray(parsedIds)) savedIds = parsedIds.filter(id => typeof id === "string");
   } catch {
     savedIds = [];
   }
@@ -142,6 +142,22 @@ function markEmployeeAsPlayed(id) {
     return false;
   }
 }
+
+function repairEmptyLeaderboardState() {
+  if (getLeaderboard().length > 0) return;
+
+  try {
+    const savedIds = JSON.parse(localStorage.getItem(PLAYED_EMPLOYEES_KEY) || "[]");
+    if (Array.isArray(savedIds) && savedIds.length > 0) {
+      localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
+    }
+  } catch {
+    localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
+  }
+}
+
+repairEmptyLeaderboardState();
+
 startBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   const enteredEmployeeId = employeeIdInput.value.trim();
@@ -162,11 +178,6 @@ startBtn.addEventListener("click", () => {
   if (getPlayedEmployeeIds().includes(normalizeEmployeeId(enteredEmployeeId))) {
     startError.textContent = "This Employee ID has already played. Each employee can play only once.";
     employeeIdInput.focus();
-    return;
-  }
-
-  if (!markEmployeeAsPlayed(enteredEmployeeId)) {
-    startError.textContent = "The game cannot verify this attempt. Enable browser storage and try again.";
     return;
   }
 
@@ -526,6 +537,7 @@ function showResults() {
   document.getElementById("stat-time").textContent = `${avgTime}s`;
 
   addLeaderboardEntry(correctCount, avgTime);
+  markEmployeeAsPlayed(employeeId);
 
   const emojiEl = document.getElementById("result-emoji");
   const titleEl = document.getElementById("result-title");
