@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Software Quality &amp; Testing Quiz</title>
-<link rel="stylesheet" href="style.css?v=admin-only-board-1">
+<link rel="stylesheet" href="style.css?v=shared-leaderboard-1">
 </head>
 <body>
 
@@ -122,6 +122,7 @@
         <small>/ 100</small>
       </div>
       <div id="result-badge" class="badge"></div>
+      <p id="result-save-status" class="result-save-status" role="status" aria-live="polite"></p>
       <div class="stats-row">
         <div class="stat"><strong id="stat-correct">0</strong><span>Correct</span></div>
         <div class="stat"><strong id="stat-wrong">0</strong><span>Wrong</span></div>
@@ -134,16 +135,14 @@
     </div>
   </section>
 
+  <!-- Shared leaderboard connection. Both values come from the Supabase
+       dashboard: Project Settings -> API. The anon key is public by design;
+       the database is protected by RLS (see supabase/schema.sql). -->
   <script>
-    // LEADERBOARD_CLEAR_20260818: clear existing demo/results data once per browser.
-    (() => {
-      const resetKey = "softwareQualityTestingLeaderboardCleared20260818";
-      if (localStorage.getItem(resetKey)) return;
-      localStorage.removeItem("softwareQualityTestingLeaderboard");
-      localStorage.setItem(resetKey, "true");
-    })();
+    window.QUIZ_SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL";
+    window.QUIZ_SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY";
   </script>
-  <script src="script.js?v=admin-only-board-1"></script>
+  <script src="script.js?v=shared-leaderboard-1"></script>
 </body>
 </html>
 

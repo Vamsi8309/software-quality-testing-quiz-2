@@ -496,6 +496,16 @@ body {
 .badge.silver { background: #E5E7EB; color: #374151; }
 .badge.bronze { background: #FFE4D6; color: #9A3412; }
 
+.result-save-status {
+  min-height: 20px;
+  margin: -12px 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.result-save-status.success { color: var(--success); }
+.result-save-status.error { color: var(--danger); }
+
 .stats-row { display: flex; justify-content: space-around; margin-bottom: 20px; }
 .stat { display: flex; flex-direction: column; }
 .stat strong { font-size: 22px; color: var(--text-dark); }

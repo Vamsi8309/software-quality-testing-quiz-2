@@ -53,12 +53,14 @@ const QUESTIONS = [
 ];
 
 const TIME_PER_QUESTION = 20;
-const LEADERBOARD_KEY = "softwareQualityTestingLeaderboard";
-const PLAYED_EMPLOYEES_KEY = "softwareQualityTestingPlayedEmployees";
-const ADMIN_PIN = "2003";
-const LEADERBOARD_LIMIT = 10;
 const POINTS_PER_QUESTION = Math.floor(100 / QUESTIONS.length);
 const EMPLOYEE_ID_PATTERN = /^\d{6,7}$/;
+const SUPABASE_URL = (window.QUIZ_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_ANON_KEY = window.QUIZ_SUPABASE_ANON_KEY || "";
+const SUPABASE_CONFIGURED = /^https:\/\/.+/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
+
+const OFFLINE_MESSAGE = "The shared leaderboard is temporarily unavailable.";
+const UNCONFIGURED_MESSAGE = "The shared leaderboard is not connected yet. Ask the admin to finish the Supabase setup.";
 
 let currentIndex = 0;
 let score = 0;
@@ -68,6 +70,7 @@ let timer = null;
 let timeLeft = TIME_PER_QUESTION;
 let answers = []; // { correct: bool, timeTaken: number }
 let questionStart = 0;
+let adminPin = "";
 
 const startScreen = document.getElementById("start-screen");
 const quizScreen = document.getElementById("quiz-screen");
@@ -93,6 +96,7 @@ const adminEmployeeIdInput = document.getElementById("admin-employee-id");
 const adminRemovePlayerBtn = document.getElementById("admin-remove-player-btn");
 const adminStatus = document.getElementById("admin-status");
 const adminRecordsList = document.getElementById("admin-records-list");
+const resultSaveStatus = document.getElementById("result-save-status");
 
 const qCounter = document.getElementById("q-counter");
 const progressFill = document.getElementById("progress-fill");
@@ -110,55 +114,78 @@ function showScreen(el) {
 }
 
 function normalizeEmployeeId(value) {
-  return value.trim().toLowerCase();
+  return value.trim();
 }
 
-function getPlayedEmployeeIds() {
-  let savedIds = [];
-  try {
-    const parsedIds = JSON.parse(localStorage.getItem(PLAYED_EMPLOYEES_KEY) || "[]");
-    if (Array.isArray(parsedIds)) savedIds = parsedIds.filter(id => typeof id === "string");
-  } catch {
-    savedIds = [];
-  }
-
-  const leaderboardIds = getLeaderboard()
-    .map(entry => entry.employeeId)
-    .filter(id => typeof id === "string" && id !== "Not provided")
-    .map(normalizeEmployeeId);
-
-  return [...new Set([...savedIds, ...leaderboardIds].map(normalizeEmployeeId))];
-}
-
-function markEmployeeAsPlayed(id) {
-  const normalizedId = normalizeEmployeeId(id);
-  const playedIds = getPlayedEmployeeIds();
-  if (!playedIds.includes(normalizedId)) playedIds.push(normalizedId);
-
-  try {
-    localStorage.setItem(PLAYED_EMPLOYEES_KEY, JSON.stringify(playedIds));
-    return true;
-  } catch {
-    return false;
+class QuizError extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
   }
 }
 
-function repairEmptyLeaderboardState() {
-  if (getLeaderboard().length > 0) return;
-
-  try {
-    const savedIds = JSON.parse(localStorage.getItem(PLAYED_EMPLOYEES_KEY) || "[]");
-    if (Array.isArray(savedIds) && savedIds.length > 0) {
-      localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
-    }
-  } catch {
-    localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
+// Every database call goes through one of the SECURITY DEFINER functions in
+// supabase/schema.sql. The anon key below cannot read or write the tables
+// directly, so admin actions stay PIN-guarded inside the database.
+async function callDatabase(fn, args = {}) {
+  if (!SUPABASE_CONFIGURED) {
+    throw new QuizError(UNCONFIGURED_MESSAGE, "unconfigured");
   }
+
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify(args)
+    });
+  } catch {
+    throw new QuizError(OFFLINE_MESSAGE, "offline");
+  }
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const detail = payload && (payload.message || payload.hint);
+    throw new QuizError(detail || OFFLINE_MESSAGE, "request_failed");
+  }
+  return payload;
 }
 
-repairEmptyLeaderboardState();
+// The admin RPCs answer with { ok: false, error: "..." } instead of an HTTP
+// error, so unwrap that into a QuizError the callers can branch on.
+function unwrap(payload) {
+  if (!payload || typeof payload !== "object") {
+    throw new QuizError(OFFLINE_MESSAGE, "offline");
+  }
+  if (payload.ok) return payload;
 
-startBtn.addEventListener("click", () => {
+  const messages = {
+    bad_pin: "Incorrect Admin PIN.",
+    pin_unset: "No Admin PIN is stored in the database yet. Run the \"Set the Admin PIN\" step from the README.",
+    duplicate: "This Employee ID has already played.",
+    not_found: "No player data was found for that Employee ID.",
+    invalid_employee_id: "Employee ID must contain exactly 6 or 7 digits.",
+    invalid_score: "That score could not be accepted."
+  };
+  throw new QuizError(messages[payload.error] || OFFLINE_MESSAGE, payload.error);
+}
+
+async function hasEmployeePlayed(id) {
+  return Boolean(await callDatabase("player_has_played", { p_employee_id: id }));
+}
+
+startBtn.addEventListener("click", async () => {
   const name = nameInput.value.trim();
   const enteredEmployeeId = employeeIdInput.value.trim();
   startError.textContent = "";
@@ -175,20 +202,29 @@ startBtn.addEventListener("click", () => {
     return;
   }
 
-  if (getPlayedEmployeeIds().includes(normalizeEmployeeId(enteredEmployeeId))) {
-    startError.textContent = "This Employee ID has already played. Each employee can play only once.";
-    employeeIdInput.focus();
-    return;
-  }
+  startBtn.disabled = true;
+  startBtn.textContent = "Checking...";
+  try {
+    if (await hasEmployeePlayed(normalizeEmployeeId(enteredEmployeeId))) {
+      startError.textContent = "This Employee ID has already played. Each employee can play only once.";
+      employeeIdInput.focus();
+      return;
+    }
 
-  playerName = name || "Player";
-  employeeId = enteredEmployeeId;
-  currentIndex = 0;
-  score = 0;
-  answers = [];
-  liveScore.textContent = "0";
-  showScreen(quizScreen);
-  loadQuestion();
+    playerName = name || "Player";
+    employeeId = enteredEmployeeId;
+    currentIndex = 0;
+    score = 0;
+    answers = [];
+    liveScore.textContent = "0";
+    showScreen(quizScreen);
+    loadQuestion();
+  } catch (error) {
+    startError.textContent = error.message || "The shared leaderboard is temporarily unavailable.";
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = "Start Game";
+  }
 });
 
 [nameInput, employeeIdInput].forEach(input => {
@@ -331,10 +367,9 @@ nextBtn.addEventListener("click", () => {
   }
 });
 
-function renderAdminRecords() {
-  const entries = getLeaderboard();
+function renderAdminRecords(entries) {
   adminRecordsList.innerHTML = "";
-  adminClearBtn.disabled = entries.length === 0 && getPlayedEmployeeIds().length === 0;
+  adminClearBtn.disabled = entries.length === 0;
 
   if (entries.length === 0) {
     const emptyRow = document.createElement("tr");
@@ -369,7 +404,13 @@ function renderAdminRecords() {
   });
 }
 
+async function fetchAdminRecords() {
+  const payload = unwrap(await callDatabase("admin_leaderboard", { p_pin: adminPin }));
+  return Array.isArray(payload.entries) ? payload.entries : [];
+}
+
 function showAdminLogin() {
+  adminPin = "";
   adminLogin.hidden = false;
   adminContent.hidden = true;
   adminPinInput.value = "";
@@ -385,6 +426,7 @@ function openAdminView() {
 }
 
 function closeAdminView() {
+  adminPin = "";
   adminModal.hidden = true;
   adminPinInput.value = "";
   adminEmployeeIdInput.value = "";
@@ -392,55 +434,57 @@ function closeAdminView() {
   showAdminStatus("");
 }
 
-function unlockAdminView() {
-  if (adminPinInput.value !== ADMIN_PIN) {
-    adminError.textContent = "Incorrect Admin PIN.";
-    adminPinInput.select();
+async function unlockAdminView() {
+  const enteredPin = adminPinInput.value.trim();
+  if (!enteredPin) {
+    adminError.textContent = "Enter the Admin PIN.";
+    adminPinInput.focus();
     return;
   }
 
-  adminError.textContent = "";
-  adminLogin.hidden = true;
-  adminContent.hidden = false;
-  adminEmployeeIdInput.value = "";
-  showAdminStatus("");
-  renderAdminRecords();
-}
-
-function clearLeaderboard() {
-  const confirmed = window.confirm(
-    "Clear all player scores and attempt records saved in this browser? Every employee will be able to play again."
-  );
-  if (!confirmed) return;
-
+  adminLoginBtn.disabled = true;
+  adminLoginBtn.textContent = "Checking...";
+  adminPin = enteredPin;
   try {
-    localStorage.removeItem(LEADERBOARD_KEY);
-    localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
-    renderAdminRecords();
-    showAdminStatus("All player data was cleared. Employees can play again.");
-  } catch {
-    showAdminStatus("Player data could not be cleared. Check browser storage permissions and try again.", true);
+    const entries = await fetchAdminRecords();
+    adminError.textContent = "";
+    adminLogin.hidden = true;
+    adminContent.hidden = false;
+    adminEmployeeIdInput.value = "";
+    renderAdminRecords(entries);
+    showAdminStatus("Showing shared scores from all devices.");
+  } catch (error) {
+    adminPin = "";
+    adminError.textContent = error.message || OFFLINE_MESSAGE;
+    adminPinInput.select();
+  } finally {
+    adminLoginBtn.disabled = false;
+    adminLoginBtn.textContent = "Unlock";
   }
 }
 
-function removePlayer() {
+async function clearLeaderboard() {
+  const confirmed = window.confirm(
+    "Clear all player scores from the shared leaderboard? Every employee will be able to play again."
+  );
+  if (!confirmed) return;
+
+  adminClearBtn.disabled = true;
+  try {
+    unwrap(await callDatabase("admin_clear_scores", { p_pin: adminPin }));
+    renderAdminRecords([]);
+    showAdminStatus("All player data was cleared. Employees can play again.");
+  } catch (error) {
+    adminClearBtn.disabled = false;
+    showAdminStatus(error.message || "Player data could not be cleared. Please try again.", true);
+  }
+}
+
+async function removePlayer() {
   const employeeIdToRemove = normalizeEmployeeId(adminEmployeeIdInput.value);
 
   if (!EMPLOYEE_ID_PATTERN.test(employeeIdToRemove)) {
     showAdminStatus("Enter a valid 6 or 7 digit Employee ID.", true);
-    adminEmployeeIdInput.focus();
-    return;
-  }
-
-  const entries = getLeaderboard();
-  const playedIds = getPlayedEmployeeIds();
-  const matchingEntryExists = entries.some(entry =>
-    typeof entry.employeeId === "string" && normalizeEmployeeId(entry.employeeId) === employeeIdToRemove
-  );
-  const matchingAttemptExists = playedIds.includes(employeeIdToRemove);
-
-  if (!matchingEntryExists && !matchingAttemptExists) {
-    showAdminStatus(`No player data was found for Employee ID ${employeeIdToRemove}.`, true);
     adminEmployeeIdInput.focus();
     return;
   }
@@ -450,23 +494,21 @@ function removePlayer() {
   );
   if (!confirmed) return;
 
-  const remainingEntries = entries.filter(entry =>
-    typeof entry.employeeId !== "string" || normalizeEmployeeId(entry.employeeId) !== employeeIdToRemove
-  );
-  const remainingPlayedIds = playedIds.filter(id => id !== employeeIdToRemove);
-
+  adminRemovePlayerBtn.disabled = true;
   try {
-    if (remainingEntries.length === 0) localStorage.removeItem(LEADERBOARD_KEY);
-    else localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(remainingEntries));
-
-    if (remainingPlayedIds.length === 0) localStorage.removeItem(PLAYED_EMPLOYEES_KEY);
-    else localStorage.setItem(PLAYED_EMPLOYEES_KEY, JSON.stringify(remainingPlayedIds));
-
+    unwrap(await callDatabase("admin_remove_player", {
+      p_pin: adminPin,
+      p_employee_id: employeeIdToRemove
+    }));
+    const entries = await fetchAdminRecords();
     adminEmployeeIdInput.value = "";
-    renderAdminRecords();
+    renderAdminRecords(entries);
     showAdminStatus(`Employee ID ${employeeIdToRemove} was removed and can play again.`);
-  } catch {
-    showAdminStatus("The player could not be removed. Check browser storage permissions and try again.", true);
+  } catch (error) {
+    showAdminStatus(error.message || "The player could not be removed. Please try again.", true);
+    adminEmployeeIdInput.focus();
+  } finally {
+    adminRemovePlayerBtn.disabled = false;
   }
 }
 
@@ -474,48 +516,27 @@ function showAdminStatus(message, isError = false) {
   adminStatus.textContent = message;
   adminStatus.className = `admin-status${isError ? " error" : ""}`;
 }
-function getLeaderboard() {
+
+async function saveLeaderboardEntry(correctCount, avgTime) {
+  resultSaveStatus.textContent = "Saving your score to the shared leaderboard...";
+  resultSaveStatus.className = "result-save-status";
   try {
-    const savedEntries = JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || "[]");
-    return Array.isArray(savedEntries)
-      ? savedEntries.filter(entry =>
-          typeof entry.name === "string" &&
-          Number.isFinite(entry.score) &&
-          Number.isFinite(entry.correct) &&
-          Number.isFinite(entry.avgTime)
-        )
-      : [];
-  } catch {
-    return [];
+    unwrap(await callDatabase("submit_score", {
+      p_employee_id: employeeId,
+      p_name: playerName,
+      p_correct: correctCount,
+      p_avg_time: avgTime
+    }));
+    resultSaveStatus.textContent = "✅ Your score was saved to the shared leaderboard.";
+    resultSaveStatus.className = "result-save-status success";
+  } catch (error) {
+    resultSaveStatus.textContent = error.code === "duplicate"
+      ? "This Employee ID already has a saved score."
+      : "Your score could not be saved. Please ask the admin to check the connection.";
+    resultSaveStatus.className = "result-save-status error";
   }
 }
 
-function addLeaderboardEntry(correctCount, avgTime) {
-  const newEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    name: playerName,
-    employeeId,
-    score,
-    correct: correctCount,
-    avgTime,
-    playedAt: Date.now()
-  };
-
-  const entries = getLeaderboard();
-  entries.push(newEntry);
-  entries.sort((a, b) =>
-    b.score - a.score ||
-    a.avgTime - b.avgTime ||
-    (a.playedAt || 0) - (b.playedAt || 0)
-  );
-
-  const topEntries = entries.slice(0, LEADERBOARD_LIMIT);
-  try {
-    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(topEntries));
-  } catch {
-    // The current results still display if browser storage is unavailable.
-  }
-}
 function showResults() {
   showScreen(resultScreen);
   const correctCount = answers.filter(a => a.correct).length;
@@ -536,8 +557,7 @@ function showResults() {
   document.getElementById("stat-wrong").textContent = wrongCount;
   document.getElementById("stat-time").textContent = `${avgTime}s`;
 
-  addLeaderboardEntry(correctCount, avgTime);
-  markEmployeeAsPlayed(employeeId);
+  saveLeaderboardEntry(correctCount, avgTime);
 
   const emojiEl = document.getElementById("result-emoji");
   const titleEl = document.getElementById("result-title");
@@ -579,6 +599,8 @@ restartBtn.addEventListener("click", () => {
   nameInput.value = "";
   employeeIdInput.value = "";
   startError.textContent = "";
+  resultSaveStatus.textContent = "";
+  resultSaveStatus.className = "result-save-status";
   nameInput.focus();
 });
 adminViewBtn.addEventListener("click", openAdminView);
